@@ -1,0 +1,196 @@
+---
+title: "Assignment 2"
+author: "jchen71"
+date: "2021/10/2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r }
+library(caret)
+library(class)
+library(gmodels)
+library(e1071)
+data<-read.csv("UniversalBank.csv")
+summary(data)
+```
+
+##1 Dummy variables
+```{r }
+data$Education1<-ifelse(data$Education==1,1,0)
+data$Education2<-ifelse(data$Education==2,1,0)
+data$Education3<-ifelse(data$Education==3,1,0)
+data<-data[,-8]
+
+```
+##2 creat the trainset and validset
+```{r}
+set.seed(150)
+Trainindex<-createDataPartition(data$ID,p=0.6,list = FALSE)
+traindata<-data[Trainindex,]
+validdata<-data[-Trainindex,]
+
+```
+
+##3 normalization
+```{r }
+ztrain<-preProcess(traindata[,c(2:4,6:8)],method = c("center","scale"))
+zTrain<-predict(ztrain,traindata)
+zValid<-predict(ztrain,validdata)
+```
+
+##4 Using KNN model
+```{r }
+Traindata<-zTrain[,c(2:4,6:8,10:16)]
+Validdata<-zValid[,c(2:4,6:8,10:16)]
+Trainlm<-traindata[,9]
+Validlm<-validdata[,9]
+Predictedval<-knn(Traindata,Validdata,cl=Trainlm,k=1,prob = FALSE)
+head(Predictedval)
+```
+
+##5 Confusion Matrix
+```{r }
+Predictedval<-knn(Traindata,Validdata,cl=Trainlm,k=1,prob = FALSE)
+Mat<-CrossTable(x=Validlm,Predictedval,prop.chisq = FALSE)
+
+
+```
+
+
+```{r }
+confusionMatrix(table(Validlm,Predictedval))
+```
+The Accuracy is 0.9595 and the sensitivity is 0.9646. 
+In this model's output, the model's performance is good. 
+
+
+##6 Creat and normalize a new customer
+```{r }
+datapro<-data[1,]
+datapro<-datapro[,c(-1,-5,-9)]
+datapro[1,]<-c(40,10,84,2,2,0,0,0,1,1,0,1,0)
+zdatapro<-predict(ztrain,datapro)
+```
+
+##7 Using this model to classify the new customer
+```{r }
+predictedcus<-knn(Traindata,zdatapro,cl=Trainlm,k=1,prob = TRUE)
+predictedcus
+```
+The output of the new customer is 1. It means that the new customer would accept the personal loan. 
+
+
+##8 Find the best k in this model (k tunning)
+```{r }
+set.seed(150)
+searchgirds<-expand.grid(k=c(1:15))
+trainmodel<-train(factor(Personal.Loan)~Age+Experience+Income+Family+CCAvg+Mortgage+
+                    Securities.Account+CD.Account+Online+CreditCard+Education1+
+                    Education2+Education3,data = traindata,method="knn",
+                  tuneGrid=searchgirds,preProcess='range')
+trainmodel
+```
+We resampled the raw data in 25 times. Then we got the result of k value. The result is similar and when k is bigger than 1, the accuracy of K is lower. They can prove that the model is not overfitting and ignoring the predictor information. The final value used for the model was k=1.
+
+
+##9 Showing the confusion matrix for the validation data that results from using the best k.
+```{r }
+predcitedval1<-knn(Traindata,Validdata,cl=Trainlm,k=1,prob = FALSE)
+Mat1<-CrossTable(x=Validlm,y=predcitedval1,prop.chisq = FALSE)
+confusionMatrix(table(Validlm,predcitedval1))
+```
+##10 Customer in best K
+```{r}
+predictedcus1<-knn(Traindata,zdatapro,cl=Trainlm,k=1,prob = TRUE)
+predictedcus1
+```
+Customer will accept the personal loan.
+
+##11 Create and normalize the trainset, the validset and the testset.
+```{r}
+set.seed(150)
+Trainindex3<-createDataPartition(data$ID,p=0.8,list = FALSE)
+Traindata3<-data[Trainindex3,]
+Comdata3<-Traindata3
+Testdata3<-data[-Trainindex3,]
+Validindex3<-createDataPartition(Traindata3$ID,p=0.375,list=FALSE)
+Validdata3<-Traindata3[Validindex3,]
+Traindata3<-Traindata3[-Validindex3,]
+ztrain3<-preProcess(Traindata3[,c(2:4,6:8)],method = c("center","scale"))
+zTrain3<-predict(ztrain3,Traindata3)
+zValid3<-predict(ztrain3,Validdata3)
+zcom3<-preProcess(Comdata3[,c(2:4,6:8)],method = c("center","scale"))
+zCom3<-predict(zcom3,Comdata3)
+zTest3<-predict(zcom3,Testdata3)
+```
+
+##12  Find the best k in this model (k tunning) for validation set.
+```{r}
+set.seed(150)
+searchgirds<-expand.grid(k=c(1:15))
+trainmodel3<-train(factor(Personal.Loan)~Age+Experience+Income+Family+CCAvg+Mortgage+
+                    Securities.Account+CD.Account+Online+CreditCard+Education1+
+                    Education2+Education3,data =Traindata3,method="knn",
+                  tuneGrid=searchgirds,preProcess='range')
+trainmodel3
+
+```
+
+##13 Showing the confusion matrix for the validation data that results from using the best k.
+```{r}
+traindata3<-zTrain3[,c(2:4,6:8,10:16)]
+validdata3<-zValid3[,c(2:4,6:8,10:16)]
+Trainlm3<-Traindata3[,9]
+Validlm3<-Validdata3[,9]
+Predictedval3<-knn(traindata3,validdata3,cl=Trainlm3,k=1,prob = FALSE)
+table(Validlm3,Predictedval3)
+Mat3<-CrossTable(x=Validlm3,y=Predictedval3,prop.chisq = FALSE)
+confusionMatrix(table(Validlm3,Predictedval3))
+```
+The model is going well in validation set.
+
+
+##14 Find the best k in this model (k tunning) for test set.
+```{r}
+searchgirds<-expand.grid(k=c(1:15))
+testmodel3<-train(factor(Personal.Loan)~Age+Experience+Income+Family+CCAvg+Mortgage+
+                     Securities.Account+CD.Account+Online+CreditCard+Education1+
+                     Education2+Education3,data =Comdata3,method="knn",
+                   tuneGrid=searchgirds,preProcess='range')
+testmodel3
+```
+
+##15 Showing the confusion matrix for the test data that results from using the best k.
+```{r}
+comdata3<-zCom3[,c(2:4,6:8,10:16)]
+testdata3<-zTest3[,c(2:4,6:8,10:16)]
+comlm3<-Comdata3[,9]
+Testlm3<-Testdata3[,9]
+predictedtest3<-knn(comdata3,testdata3,cl=comlm3,k=1,prob = FALSE)
+Mattest3<-CrossTable(x=Testlm3,y=predictedtest3,prop.chisq = FALSE)
+confusionMatrix(table(Testlm3,predictedtest3))
+```
+Compared to confusion matrix of validation set, the accuracy and senstivity of test set is higher. The reason is that the training data in test set is larger than validation set. It can reduced the influence of overfitting and underfitting. The model may be going better for test set. And the model is learning well. 
+
+
+
+
+##16 New customer in best K
+```{r}
+datapro[1,]<-c(40,10,84,2,2,0,0,0,1,1,0,1,0)
+zdatapro3<-predict(zcom3,datapro)
+predictedcus3<-knn(testdata3,zdatapro3,cl=Testlm3,k=1,prob = TRUE)
+predictedcus
+```
+The new customer will accept the personal loan.
+
