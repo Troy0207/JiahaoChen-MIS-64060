@@ -1,0 +1,112 @@
+---
+title: "Assignment 3"
+author: "Jiahao Chen"
+date: "2021/10/17"
+output: html_document
+---
+##1 input the data
+```{r}
+library(caret)
+library(class)
+library(e1071)
+library(gmodels)
+
+data<-read.csv("UniversalBank.csv")
+data<-data[,c(10,13,14)]
+summary(data)
+str(data)
+data$Personal.Loan<-as.factor(data$Personal.Loan)
+data$Online<-as.factor(data$Online)
+data$CreditCard<-as.factor(data$CreditCard)
+str(data)
+
+
+```
+
+
+##2 create the training and validation data
+```{r}
+set.seed(150)
+Trainindex<-createDataPartition(data$Personal.Loan,p=0.6,list = FALSE)
+traindata<-data[Trainindex,]
+validdata<-data[-Trainindex,]
+
+
+```
+
+
+
+##3 create pviot table
+
+#a CC Loan Online
+```{r}
+attach(traindata)
+ftable(CreditCard,Personal.Loan,Online)
+detach(traindata)
+```
+The amount of people who has Credit Cards and is active in online service is 503. The amount of people who accepts the loan is 46. So the probability is 0.0915.
+
+
+#b Loan and  Online
+```{r}
+CrossTable(table(traindata$Personal.Loan,traindata$Online))
+
+
+```
+P(online=1|Loan=1)=0.615
+
+P(Loan=1)=0.096
+
+P(online=1|Loan=0)=0.385
+
+#c Loan and  Credit Card
+```{r}
+CrossTable(table(traindata$Personal.Loan,traindata$CreditCard))
+```
+P(CC=1|Loan=1)=0.267
+
+P(CC=1|Loan=0)=0.290
+
+P(Loan=0)=0.904
+
+P(Loan=1|CC=1,Online=1)
+
+=[P(CC=1|Loan=1)*P(Online=1|Loan=1)*P(Loan=1)]/P(CC=1,Online=1)
+
+=(0.267*0.615*0.096)/(0.288*0.588)=0.09308
+
+The probability using Naive Bayes is bigger than the probability calculating directly. I think that the probability of calculating directly is more accurate.
+
+##4 Create the Naive Bayes Model
+```{r}
+set.seed(150)
+Loan.mod<-naiveBayes(Personal.Loan~.,data = traindata)
+Loan.mod
+
+```
+##5 Output the confusion matrix
+
+#a Training set
+```{r}
+preTra<-predict(Loan.mod,newdata = traindata)
+preTrar<-predict(Loan.mod,newdata = traindata,type = "raw")
+confusionMatrix(preTra,traindata$Personal.Loan)
+
+```
+#b Validation set
+```{r}
+preValr<-predict(Loan.mod,newdata = validdata,type = "raw")
+preVal<-predict(Loan.mod,newdata = validdata)
+confusionMatrix(preVal,validdata$Personal.Loan)
+```
+
+
+#c Test set
+```{r}
+ad<-data.frame(actual=validdata$Personal.Loan,predicted=preVal,preValr)
+head(ad[validdata$Online== 1 & validdata$CreditCard== 1,])
+```
+ The probability is 0.09334.These two answers are very closed.
+
+ 
+ 
