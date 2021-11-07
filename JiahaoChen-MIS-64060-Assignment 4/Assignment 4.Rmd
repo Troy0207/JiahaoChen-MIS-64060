@@ -1,0 +1,113 @@
+---
+title: "Assignment 4"
+author: "Jiahao Chen"
+date: "10/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+```{r }
+library(tidyverse)
+library(factoextra)
+data.pro<-read.csv("Pharmaceuticals.csv")
+str(data.pro)
+```
+The all variables that we used is numeric variables. So the K-Means might be a good way to cluster.
+
+#  Normalize the numeric variables
+
+```{r }
+data.pro1<-data.pro[,3:11]
+data.pro1<-scale(data.pro1)
+distance<-get_dist(data.pro1)
+summary(data.pro1)
+```
+
+
+```{r }
+fviz_dist(distance) # read the variables distance
+```
+
+
+
+We can find the items' nearest neighbor roughly through the graph.
+
+
+# Find the appropriate K value in K means
+```{r }
+# assuming the same weight of 9 variables
+set.seed(150)
+fviz_nbclust(data.pro1,kmeans,method = "wss")
+fviz_nbclust(data.pro1,kmeans,method = "silhouette")
+```
+
+
+According to  the Elbow and Silhouette Method to find the appropriate K value is 5.
+
+
+# K-means for this 9 variables 
+```{r}
+set.seed(150)
+k5<-kmeans(data.pro1,centers = 5,nstart = 30)
+k5$centers
+```
+
+
+```{r}
+k5$size
+```
+
+
+```{r}
+fviz_cluster(k5,data = data.pro1)
+```
+
+
+According to the graph and the summary, Cluster 1 is the companies with Medium cap,low beta,high P/E ratio,low ROE and low NPM. Cluster2 is the companies with small cap, high beta, low P/E ratio, low ROE, low asset turnover,high leverage and high rev growth. Cluster3 is the companies with medium cap,low P/E ratio, medium ROE and ROA,low REV growth and high NPM. Cluster 4 is the companies with large cap, high ROE,ROA NPM and AT, and low leverage. Cluster 5 is the companies with small cap,high beta, low ROA, high leverage and low NPM. 
+
+
+# categorical variables in cluster
+```{r}
+data.pro$code<-c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21)
+data.pro$cluster<-ifelse(data.pro$code==2|data.pro$code==18,1,ifelse(data.pro$code==5|data.pro$code==20|data.pro$code==14|data.pro$code==9,2,ifelse(data.pro$code==11|data.pro$code==17|data.pro$code==13|data.pro$code==15,4,ifelse(data.pro$code==6|data.pro$code==8|data.pro$code==12,5,3))))
+
+```
+
+
+```{r}
+pp<-ggplot(data.pro,aes(x=cluster))
+pp+geom_histogram(bins=30,aes(fill=Median_Recommendation))
+```
+
+According to the graph, Cluster 1,4 and 5 are mix of Moderate Buy and Hold. Cluster 2 is mix of Moderate Sell and Hold. Cluster 3 is the mix of all of four types. 
+
+```{r}
+pp+geom_histogram(bins=30,aes(fill=Location))
+```
+
+According to the graph, Cluster 4 and 5 are mainly from US. Cluster 1 is from US and Canada. Cluster 2 is from US, France and Ireland. Cluster 3 is form US, UK and Switzerland.
+
+
+
+
+```{r}
+pp+geom_histogram(bins=30,aes(fill=Exchange))
+```
+
+
+
+According to the graph, Cluster 1,2,3 and 4 are from NYSE market. Cluster 5 is from AMEX, NASDAQ and NYSE markets.
+
+According all of three charts, I think that Exchange variable might be a pattern for this clusters. But Location and Recommendation variables might be meaningless.
+
+# Summary for Clusters
+
+According to all variables, Cluster 1 is the companies with medium cap and stocks with low risk and expected  in NYSE markets. Cluster 2 is the companies with companies with small cap and high leverage and stocks with high risk and unpopular in NYSE markets. Cluster 3 is the companies with medium cap and high net income and stocks with valued and complex to recommend in NYSE markets. Cluster 4 is the companies with large cap and high assets and stocks with valued and popular in NYSE markets. Cluster 5 is the companies with small cap and high leverage and stocks with popular in three markets.
+
+
