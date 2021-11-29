@@ -1,0 +1,225 @@
+---
+title: "Assignment 5"
+author: "Jiahao Chen"
+date: "2021/11/28"
+output: html_document
+---
+
+
+# Data Preparation
+```{r }
+library(cluster)
+library(tidyverse)
+library(factoextra)
+library(caret)
+library(dplyr)
+library(ggplot2)
+data.pro<-read.csv("Cereals.csv")
+data.pro<-na.omit(data.pro)
+data.pro$name<-as.factor(data.pro$name)
+data.pro$mfr<-as.factor(data.pro$mfr)
+data.pro$type<-as.factor(data.pro$type)
+summary(data.pro)
+```
+
+In the output, the majority of breakfast manufacturers are G and K. Almost breakfast type is C.
+
+
+
+
+# Normalize the numerical variables
+```{r}
+data.pro_norm<-data.pro
+data.pro_norm[,c(4:16)]<-scale(data.pro[,c(4:16)])
+head(data.pro_norm)
+
+```
+
+
+
+# Hierarchical Clustering with Agnes
+
+We need to choose the higher value for strong clustering structure.
+```{r}
+hc_single<-agnes(data.pro_norm[,c(4:16)],method = "single")
+hc_complete<-agnes(data.pro_norm[,c(4:16)],method = "complete")
+hc_averages<-agnes(data.pro_norm[,c(4:16)],method = "average")
+hc_ward<-agnes(data.pro_norm[,c(4:16)],method = "ward")
+
+```
+
+
+## Compared Agglomerative coefficients
+
+```{r}
+print(hc_single$ac)
+```
+
+
+```{r}
+print(hc_complete$ac)
+```
+
+
+```{r}
+print(hc_averages$ac)
+```
+
+
+```{r}
+print(hc_ward$ac)
+```
+
+Best link method is Ward.
+
+# Choose number of cluster
+
+## Using elbow and silhouette method
+```{r}
+fviz_nbclust(data.pro_norm[,c(4:16)],hcut,method = "wss")
+```
+
+```{r}
+fviz_nbclust(data.pro_norm[,c(4:16)],hcut,method = "silhouette")
+```
+
+Form silhouette method, the value of K is 10. But we might combine with the original data and decision tree analysis.
+
+## Cutting Dendrograms
+
+```{r}
+d<-dist(data.pro_norm[,c(4:16)],method = "euclidean")
+hw<-hclust(d,method = "ward.D2")
+plot(hw,cex=0.6,hang = -1)
+rect.hclust(hw,k=5,border=1:5)
+```
+
+
+From the original data and cutting Dendrogram graph, I would like to choose that value of Cluster equals to 5. They have moderate similarity and sufficient sample size in their respective categories, and will not produce two overly similar categories due to too much detail.  
+
+
+## visual the clusters
+```{r}
+cl<-cutree(hw,k=5)
+data.pro_norm$cl<-cl
+data.pro_norm$cl<-as.factor(data.pro_norm$cl)
+fviz_cluster(list(data=data.pro_norm[,c(4:16)],cluster=cl))
+```
+
+As you can see from the diagram, there is still a small amount of overlap in the clusters.
+
+# Cluster Stability
+
+```{r}
+set.seed(150)
+Index<-createDataPartition(data.pro_norm$calories,p=0.6,list = F) #Divide the data into 60% and 40%
+acdata<-data.pro_norm[Index,]
+padata<-data.pro_norm[-Index,]
+hc_single<-agnes(acdata[,c(4:16)],method = "single")
+hc_complete<-agnes(acdata[,c(4:16)],method = "complete")
+hc_averages<-agnes(acdata[,c(4:16)],method = "average")
+hc_ward<-agnes(acdata[,c(4:16)],method = "ward")
+
+```
+
+
+
+```{r}
+print(hc_single$ac)
+```
+
+
+```{r}
+print(hc_complete$ac)
+```
+
+
+```{r}
+print(hc_averages$ac)
+```
+
+```{r}
+print(hc_ward$ac)
+```
+
+
+The best linkage method is Ward.
+
+## Cluster from acdata
+Assuming that the value of k is equal to the all data.
+```{r}
+d<-dist(acdata[,c(4:16)],method = "euclidean")
+hw<-hclust(d,method = "ward.D2")
+cl1<-cutree(hw,k=5)
+table(cl1)
+acdata$cl1<-cl1
+
+```
+## Cluster centroid in acdata
+
+```{r}
+acdatacl1<-summarise(group_by(acdata,cl1),calories=mean(calories),protein=mean(protein),fat=mean(fat),sodium=mean(sodium),fiber=mean(fiber),carbo=mean(carbo),sugars=mean(sugars),potass=mean(potass),vitamins=mean(vitamins),shelf=mean(shelf),weight=mean(weight),cups=mean(cups),rating=mean(rating))
+ac<-matrix(nrow = 29,ncol = 5 )
+cl2<-matrix(nrow=29,ncol = 1)
+```
+
+```{r}
+for(i in 1:29){
+  for(j in 1:5){
+   ab<-rbind(padata[i,c(4:16)],acdatacl1[j,c(2:14)])
+   ac[i,j]<-dist(ab,method = "euclidean")
+  
+  }
+}
+colnames<-c("1","2","3","4","5")
+colnames(ac)<-colnames
+ac<-as.data.frame(ac)
+
+
+
+for(i in 1:29){
+  cl2[i,1]<-which.min(ac[i,])
+}
+padata<-cbind(padata,cl2)
+acdata$cl<-as.numeric(acdata$cl)
+acdata$code<-c(1:45)
+padata$cl<-as.numeric(padata$cl)
+padata$code<-c(1:29)
+ggplot(acdata,aes(x=acdata$code,y=acdata$cl))+geom_point(color="green")+geom_point(y=acdata$cl1,color="red")+xlab("code")+ylab("cluster")+ggtitle("Cluster difference with All data and Paration A")
+
+```
+
+In these graph, many records are divided into different clusters.
+
+
+```{r}
+ggplot(padata,aes(x=code,y=cl))+geom_point(color="green")+geom_point(y=cl2,color="red")+xlab("code")+ylab("cluster")+ggtitle("Cluster difference with All data and Paration B")
+```
+
+
+In these two graph, there are so many records that have different clusters. So the cluster stability is very low.
+
+
+
+# Recommendation of Healthy Food
+
+For the healthy food, I think we should find the breakfast that have the high protein and fiber,low sugar and sodium. The data normalization is used to establish the model without scale affection. But we use non-normalized data to make recommendations. So I also use 5 clusters.
+
+
+
+```{r}
+data.pro$cl<-cl
+data.pro1<-summarise(group_by(data.pro,cl),calories=mean(calories),protein=mean(protein),fat=mean(fat),sodium=mean(sodium),fiber=mean(fiber),carbo=mean(carbo),sugars=mean(sugars),potass=mean(potass),vitamins=mean(vitamins),shelf=mean(shelf),weight=mean(weight),cups=mean(cups),rating=mean(rating))
+mdf<-reshape2::melt(data.pro1,id.var="cl")
+ggplot(mdf,aes(x=cl,y=value,color=variable))+geom_point()+xlab("cluster")+ggtitle("Cluster Analysis")
+```
+
+From Cluster Analysis, the food in cluster 5 have less sodium and the other ingredient are similar. So I choose the food in cluster 5 for recommendation.
+
+
+```{r}
+row.names(data.pro) <- data.pro[,1]
+rownames(data.pro)[cl==5]
+```
+
+The name of these items are Frosted_Mini-Wheats, Maypo, Puffed_Rice, Puffed_Wheat, Raisin_Squares, Shredded_Wheat,    Shredded_Wheat_'n'Bran, Shredded_Wheat_spoon_size and Strawberry_Fruit_Wheats.  
